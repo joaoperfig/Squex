@@ -86,9 +86,13 @@ class Board:
     def play2(self, l, c):
         self.play(2, l, c)
         
-    def play(self, player, l, c):
+    def play(self, player, l, c, force = False):
         if not self._content[l][c].isempty():
-            print("Trying to play on non empty space, continuing anyway")
+            if not force:
+                #print("Trying to play on non empty space, ignoring play")
+                return
+            else:
+                print("Trying to play on non empty space, forcing play")
         self._content[l][c].play(player)
         neigh = self.getneighbors(l, c)
         for n in neigh:
@@ -96,6 +100,31 @@ class Board:
                 mid = (int(((n[0]+l)/2)-0.5),int(((n[1]+c)/2)-0.5))
                 if self.getd(mid[0], mid[1]) == 0:
                     self._diagonals[mid[0]][mid[1]].play(player)
+        
+    def haswon1(self):
+        return self.haswon(1)
+    
+    def haswon2(self):
+        return self.haswon(2)
+    
+    def haswon(self, player):
+        current = ()
+        if player == 2:
+            for i in range(self._c):
+                current = current + ((-1, i),) #imaginary line of placed pieces above the board
+            current = findjoined(self, 2, current, ()) #adjacent tiles are expanded
+            for c in current:
+                if c[0] == self._l-1:
+                    return True
+            return False
+        if player == 1:
+            for i in range(self._c):
+                current = current + ((i, -1),) #imaginary line of placed pieces left to the board
+            current = findjoined(self, 1, current, ()) #adjacent tiles are expanded
+            for c in current:
+                if c[1] == self._c-1:
+                    return True
+            return False
         
         
 def multiplayer():
@@ -119,24 +148,56 @@ def multiplayer():
             if board._content[res[0]][res[1]].isempty():
                 board.play2(res[0],res[1])  
                 break
-            
-def player2verticalconnectivity(board):
-    
-    def findjoined(b, current, old):
-        found = False
+
+def findjoined(b, player,current, old): #find pieces directly connected to current
+    while True:
+        prev = current
         for c in current:
             for n in b.getneighbors(c[0], c[1]):
-                if b.getc(n[0], n[1]) == 2: #see if belongs to player 2
-                    if (n[0]==c[0]) or (n[1]==c[1]) or (b.getd(int(((n[0]+c[0])/2)-0.5),int(((n[1]+c[1])/2)-0.5)) == 2): #if it is diagonal, need middle piece
+                if b.getc(n[0], n[1]) == player: #see if belongs to player
+                    if (n[0]==c[0]) or (n[1]==c[1]) or (b.getd(int(((n[0]+c[0])/2)-0.5),int(((n[1]+c[1])/2)-0.5)) == player): #if it is diagonal, need middle piece
                         if (not n in current) and (not n in old):
                             current = current + (n,) #is adjacent, adds to current
-                            found = True
-        
-        
-    
+        if prev == current:
+            return current
+
+            
+def player2verticalconnectivity(board): #returns minimum plays for player2 to win
+    def expand(b, current, old):
+        for c in current:
+            for n in b.getneighbors(c[0], c[1]):
+                if b.getc(n[0], n[1]) != 1: #checks if not belongs to player 1
+                    if (n[0]==c[0]) or (n[1]==c[1]) or (b.getd(int(((n[0]+c[0])/2)-0.5),int(((n[1]+c[1])/2)-0.5)) != 1): #if it is diagonal, needs free middle piece
+                        if (not n in current) and (not n in old):
+                            current = current + (n,)      
+        return current
+                        
+    def inbottom(board, current): #current selection did not reach the end
+        for c in current:
+            if c[0] == board._l-1:
+                return True
+        return False
     cost = 0
     old = ()
     current = ()
     for i in range(board._c):
-        current = current + ((-1, i)) #imaginary line of placed pieces above the board
+        current = current + ((-1, i),) #imaginary line of placed pieces above the board
+    current = findjoined(board, 2, current, old)
+    
+    while not inbottom(board, current):
+        cost = cost + 1
+        old = current
+        current = expand(board, current, old)
+        current = findjoined(board, 2, current, old)
+        newcurrent = ()
+        for c in current:
+            if not c in old:
+                newcurrent = newcurrent + (c,)
+        current = newcurrent
+        if cost > 100:
+            return 100 #player 1 won?
+    return cost
+        
+
+        
     
